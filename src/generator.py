@@ -3,38 +3,42 @@ import os
 import json
 import datetime
 
-# 读取配置
+# ===========================
+# 1. 强壮的配置读取
+# ===========================
 def load_config():
-    # 优先读取 config.json
+    config = {
+        "site_name": "Comparison Site",
+        "domain": "https://ii-x.com",
+        "niche_keywords": "Review",
+        "hero_title": "Best Tools Compared",
+        "primary_color": "#2563eb",
+        "data_file": "data.csv"
+    }
+    
+    # 尝试读取 config.json
     if os.path.exists('config.json'):
         try:
             with open('config.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
+                loaded = json.load(f)
+                config.update(loaded)
         except Exception as e:
-            print(f"⚠️ Config Error: {e}")
+            print(f"⚠️ Config JSON Syntax Error (Fix config.json!): {e}")
+            # 如果配置错了，这里做一个智能回退，根据文件名猜测业务
+            if os.path.exists(os.path.join('data', 'vpn_raw.csv')):
+                config['data_file'] = 'vpn_raw.csv'
+                config['site_name'] = 'VPN Privacy Shield'
+            elif os.path.exists(os.path.join('data', 'esim_raw.csv')):
+                config['data_file'] = 'esim_raw.csv'
+                config['site_name'] = 'Global eSIM'
     
-    # ⚠️ 关键修改：如果没找到配置，我们不再瞎猜 data.csv
-    # 而是根据当前目录下的文件自动判断是 VPN 还是 eSIM
-    default_data = "data.csv"
-    if os.path.exists(os.path.join('data', 'vpn_raw.csv')):
-        default_data = "vpn_raw.csv"
-    elif os.path.exists(os.path.join('data', 'esim_raw.csv')):
-        default_data = "esim_raw.csv"
-        
-    print(f"⚠️ Using Default Config. Auto-detected data file: {default_data}")
-    
-    return {
-        "site_name": "Site Config Missing",
-        "domain": "https://ii-x.com",
-        "niche_keywords": "Review",
-        "hero_title": "Comparison Site",
-        "primary_color": "#2563eb",
-        "data_file": default_data  # 这里变聪明了
-    }
+    return config
 
 CONFIG = load_config()
 
-# 导航栏 (绝对路径闭环)
+# ===========================
+# 2. 样式与导航
+# ===========================
 NAV_BAR = """
 <nav style="background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid #333;">
     <a href="https://compare.ii-x.com" style="color: #fff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 1.1rem; opacity: 0.8;">🤖 AI Tools</a>
@@ -64,21 +68,28 @@ CSS = """
 </style>
 """.format(primary_color=CONFIG.get('primary_color', '#2563eb'))
 
+# ===========================
+# 3. 核心生成逻辑 (含防爆盾)
+# ===========================
 def generate_site():
-    print("🔄 Building Site with Config...")
+    print(f"🔄 Building Site: {CONFIG['site_name']}...")
     file_path = os.path.join('data', CONFIG.get('data_file', 'data.csv'))
     
     if not os.path.exists(file_path):
-        print(f"❌ Data file {file_path} not found!")
+        print(f"❌ Critical: Data file {file_path} NOT found.")
+        # 创建一个假的 index.html 防止 404
+        with open('index.html', 'w') as f: f.write("<h1>Data Pending...</h1>")
         return
 
     with open(file_path, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
         try:
             headers = next(reader)
+            # 清理表头空白
+            headers = [h.strip() for h in headers]
             rows = list(reader)
         except StopIteration:
-            print("❌ CSV file is empty!")
+            print("❌ CSV is empty.")
             return
 
     html_content = f"""
@@ -87,53 +98,61 @@ def generate_site():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{CONFIG['site_name']} | 2026 Comparison</title>
-        <meta name="description" content="Compare the best {CONFIG['niche_keywords']} options. Unbiased reviews, speed tests, and pricing analysis.">
-        <meta name="keywords" content="{CONFIG['niche_keywords']}">
-        <meta property="og:type" content="website">
-        <meta property="og:url" content="{CONFIG['domain']}">
-        <meta property="og:title" content="{CONFIG['site_name']}">
-        <meta property="og:description" content="{CONFIG['hero_title']}">
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+        <title>{CONFIG['site_name']}</title>
+        <meta name="description" content="{CONFIG['hero_title']}">
         {CSS}
     </head>
     <body>
         {NAV_BAR}
         <div class="container">
             <h1>{CONFIG['hero_title']}</h1>
-            <p class="update-time">✅ Last Verified: {datetime.datetime.now().strftime('%Y-%m-%d')} | Data Source: Global Real-time Monitoring</p>
+            <p class="update-time">✅ Verified: {datetime.datetime.now().strftime('%Y-%m-%d')} | Source: {CONFIG['data_file']}</p>
             
             <table class="comparison-table">
                 <thead><tr>
     """
     
-    # 动态表头
+    # 动态表头 (排除不展示的列)
+    hidden_cols = ['Affiliate_Link', 'Description', 'Badge', 'Link']
+    display_headers = []
     for h in headers:
-        if h not in ['Affiliate_Link', 'Description', 'Badge', 'Link']:
+        if h not in hidden_cols:
+            display_headers.append(h)
             html_content += f"<th>{h.replace('_', ' ')}</th>"
     html_content += "<th>Action</th></tr></thead><tbody>"
     
-    # 动态数据行
-    for row in rows:
-        html_content += "<tr>"
-        try:
-            # 尝试找 Affiliate_Link 或 Link 列
-            if 'Affiliate_Link' in headers:
-                link = row[headers.index('Affiliate_Link')]
-            elif 'Link' in headers:
-                link = row[headers.index('Link')]
-            else:
-                link = "#"
-        except:
-            link = "#"
+    # 动态数据行 (防崩溃核心逻辑)
+    for row_idx, row in enumerate(rows):
+        # 跳过空行
+        if not row: continue
 
-        for i, cell in enumerate(row):
-            col_name = headers[i]
-            if col_name in ['Affiliate_Link', 'Description', 'Badge', 'Link']: continue
+        html_content += "<tr>"
+        
+        # 1. 安全提取链接
+        link = "#"
+        if 'Affiliate_Link' in headers:
+            # 安全索引，防止找不到
+            try:
+                idx = headers.index('Affiliate_Link')
+                if idx < len(row): link = row[idx]
+            except: pass
+        
+        # 2. 填充单元格 (防崩溃循环)
+        # 我们只遍历表头，确保不会因为数据列多了而越界
+        for col_idx, col_name in enumerate(headers):
+            # 如果这一列是不需要显示的，跳过
+            if col_name in hidden_cols: continue
             
+            # 【核心修复】：防止 list index out of range
+            # 如果数据列比表头短，填空；如果长，忽略多余的
+            if col_idx < len(row):
+                cell = row[col_idx]
+            else:
+                cell = "" 
+
+            # 样式处理
             display = cell
-            # 智能着色逻辑
-            lower_cell = cell.lower()
+            lower_cell = str(cell).lower()
             if any(x in lower_cell for x in ['yes', 'true', 'netflix', 'unlimited', '4k']):
                 display = f'<span class="tag tag-green">{cell}</span>'
             elif any(x in lower_cell for x in ['no', 'false', 'block']):
@@ -141,14 +160,11 @@ def generate_site():
             
             html_content += f"<td>{display}</td>"
         
-        html_content += f'<td><a href="{link}" target="_blank" rel="nofollow sponsored" class="btn">Check Price</a></td></tr>'
+        html_content += f'<td><a href="{link}" target="_blank" class="btn">Check Price</a></td></tr>'
 
     html_content += """
                 </tbody>
             </table>
-            <div style="text-align:center; margin-top:50px; color:#555; font-size:0.8rem;">
-                &copy; 2026 ii-x.com Network. All Rights Reserved.
-            </div>
         </div>
     </body>
     </html>
@@ -156,8 +172,7 @@ def generate_site():
     
     with open('index.html', 'w', encoding='utf-8') as f:
         f.write(html_content)
-    print(f"✅ index.html generated for {CONFIG['site_name']}!")
+    print(f"✅ index.html generated successfully!")
 
 if __name__ == "__main__":
     generate_site()
-
