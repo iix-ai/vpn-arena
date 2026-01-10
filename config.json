@@ -1,8 +1,8 @@
 {
-  "site_name": "Privacy Shield | Top VPNs Compared",  // 网站标题
-  "domain": "https://vpn.ii-x.com",                   // 核心域名 (影响 SEO Canonical)
-  "niche_keywords": "VPN, Privacy, Streaming, Security", // SEO 关键词
-  "hero_title": "Stop Being Tracked online.",         // 首页大标题
-  "primary_color": "#2563eb",                         // 主题色 (蓝色适合科技/安全)
-  "data_file": "vpn_raw.csv"                          // 指定数据源文件名
+  "site_name": "Privacy Shield | Top VPNs Compared",
+  "domain": "https://vpn.ii-x.com",
+  "niche_keywords": "VPN, Privacy, Streaming, Security",
+  "hero_title": "Stop Being Tracked Online",
+  "primary_color": "#2563eb",
+  "data_file": "vpn_raw.csv"
 }
