@@ -4,5 +4,7 @@
   "niche_keywords": "VPN, Privacy, Streaming, Security",
   "hero_title": "Stop Being Tracked Online",
   "primary_color": "#2563eb",
-  "data_file": "vpn_raw.csv"
+  "data_file": "vpn_raw.csv",
+  "icon": "🛡️",
+  "year": "2026"
 }
