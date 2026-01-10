@@ -1,144 +1,109 @@
-import pandas as pd
-from jinja2 import Environment, FileSystemLoader
+import csv
 import os
-import shutil
 import datetime
 
-# 翻译字典：让界面文字也变成本地语言
-TRANSLATIONS = {
-    'en': {
-        'folder': '',
-        'title_suffix': 'The Honest Review',
-        'verdict_title': 'The Verdict',
-        'check_price': 'Check Pricing',
-        'price_chart': 'Price Comparison',
-        'pros_hero': 'Advantages',
-        'pros_comp': 'Advantages',
-        'rated': 'Rated',
-        'footer_rights': 'All rights reserved.',
-        'col_pros': 'Pros', 'col_cons': 'Cons', 'col_verdict': 'Verdict' # 对应CSV列名后缀
-    },
-    'es': {
-        'folder': 'es',
-        'title_suffix': 'Opinión Honesta',
-        'verdict_title': 'El Veredicto',
-        'check_price': 'Ver Precios',
-        'price_chart': 'Comparación de Precios',
-        'pros_hero': 'Ventajas',
-        'pros_comp': 'Ventajas',
-        'rated': 'Calificado',
-        'footer_rights': 'Todos los derechos reservados.',
-        'col_pros': 'Pros_ES', 'col_cons': 'Cons_ES', 'col_verdict': 'Verdict_ES'
-    },
-    'pt': {
-        'folder': 'pt',
-        'title_suffix': 'Análise Honesta',
-        'verdict_title': 'O Veredito',
-        'check_price': 'Ver Preços',
-        'price_chart': 'Comparação de Preços',
-        'pros_hero': 'Vantagens',
-        'pros_comp': 'Vantagens',
-        'rated': 'Avaliado',
-        'footer_rights': 'Todos os direitos reservados.',
-        'col_pros': 'Pros_PT', 'col_cons': 'Cons_PT', 'col_verdict': 'Verdict_PT'
-    }
-}
+# 1. 资源配置 (注意：导航栏使用绝对链接，打通三个站点)
+NAV_BAR = """
+<nav style="background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid #333;">
+    <a href="https://compare.ii-x.com" style="color: #fff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 1.1rem;">🤖 AI Tools</a>
+    <span style="color: #555;">|</span>
+    <a href="https://vpn.ii-x.com" style="color: #d946ef; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 1.1rem;">🛡️ VPN Privacy</a>
+    <span style="color: #555;">|</span>
+    <a href="https://esim.ii-x.com" style="color: #fff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 1.1rem;">📲 Travel eSIM</a>
+</nav>
+"""
 
-def generate_pages(csv_file, config):
-    print("🏭 [Generator] Building Multi-language Site...")
-    
-    base_output_dir = 'public'
-    if os.path.exists(base_output_dir):
-        shutil.rmtree(base_output_dir)
-    os.makedirs(base_output_dir)
-    
-    # 复制静态资源
-    os.makedirs(f"{base_output_dir}/images", exist_ok=True)
-    os.makedirs(f"{base_output_dir}/static", exist_ok=True)
-    
-    if os.path.exists('static'):
-        # 复制 favicon 等
-        for item in os.listdir('static'):
-            s = os.path.join('static', item)
-            d = os.path.join(f"{base_output_dir}/static", item)
-            if os.path.isfile(s): shutil.copy2(s, d)
+CSS = """
+<style>
+    :root { --primary: #2563eb; --bg: #0f172a; --text: #f8fafc; --card-bg: #1e293b; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 50px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; margin: 40px 0; font-size: 2.5rem; background: linear-gradient(to right, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .update-time { text-align: center; color: #94a3b8; margin-bottom: 30px; font-size: 0.9rem; }
+    .comparison-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    th { background: #334155; color: #fff; padding: 16px; text-align: left; font-weight: 600; text-transform: uppercase; font-size: 0.85rem; }
+    td { padding: 16px; border-bottom: 1px solid #334155; color: #cbd5e1; vertical-align: middle; }
+    tr:hover { background: #2d3748; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; }
+    .tag { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+    .tag-green { background: #064e3b; color: #34d399; }
+    .tag-red { background: #450a0a; color: #fca5a5; }
+</style>
+"""
 
-    if os.path.exists('data/images'):
-        for img in os.listdir('data/images'):
-            shutil.copy(f"data/images/{img}", f"{base_output_dir}/images/{img}")
-
-    if not os.path.exists(csv_file): return
-
-    df = pd.read_csv(csv_file).fillna("")
-    env = Environment(loader=FileSystemLoader('templates'))
-    tpl_compare = env.get_template('comparison.html')
+def generate_vpn_site():
+    print("🔄 Building VPN Site...")
+    # 路径指向 data/vpn_raw.csv
+    file_path = os.path.join('data', 'vpn_raw.csv')
     
-    hero = config['hero_product']
-    try:
-        hero_data = df[df['Tool_Name'] == hero].iloc[0]
-    except:
+    # 简单的容错读取
+    if not os.path.exists(file_path):
+        print("❌ Data file not found!")
         return
 
-    # --- 核心循环：遍历三种语言 ---
-    for lang, trans in TRANSLATIONS.items():
-        print(f"   🌍 Generating {lang.upper()} pages...")
-        
-        # 确定输出子目录
-        if trans['folder']:
-            current_output_dir = f"{base_output_dir}/{trans['folder']}"
-            os.makedirs(current_output_dir, exist_ok=True)
-            # 这里的 images 路径需要处理，为了简单，我们在 HTML 里用绝对路径 config.domain
-        else:
-            current_output_dir = base_output_dir
+    with open(file_path, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        rows = list(reader)
 
-        pages_meta = []
-        
-        for index, row in df.iterrows():
-            comp = row['Tool_Name']
-            if comp == hero: continue
+    # 动态生成 HTML
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Top VPN Services Compared | Privacy Shield</title>
+        {CSS}
+    </head>
+    <body>
+        {NAV_BAR}
+        <div class="container">
+            <h1>🛡️ The Best Log-Free VPNs (2025)</h1>
+            <p class="update-time">Last Verified: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} UTC</p>
             
-            slug = f"{hero.lower()}-vs-{comp.lower().replace(' ', '-')}"
-            
-            # 获取对应语言的数据
-            # 如果是 ES/PT，读取 Pros_ES/Pros_PT；如果是 EN，读取 Pros
-            # 注意：CSV列名可能为空，要做容错
-            hero_pros = str(hero_data.get(trans['col_pros'], hero_data['Pros']))
-            comp_pros = str(row.get(trans['col_pros'], row['Pros']))
-            verdict_text = str(row.get(trans['col_verdict'], row['Verdict']))
-
-            # 价格逻辑
-            price_diff = float(row['Price']) - float(hero_data['Price'])
-            reason = verdict_text if verdict_text else (f"Save ${int(price_diff)}/mo" if price_diff > 0 else "Great alternative")
-
-            html = tpl_compare.render(
-                config=config,
-                hero=hero_data,
-                comp=row,
-                slug=slug,
-                reason=reason,
-                hero_pros=hero_pros,
-                comp_pros=comp_pros,
-                trans=trans, # 传入翻译字典
-                lang_code=lang
-            )
-            
-            with open(f"{current_output_dir}/{slug}.html", "w", encoding="utf-8") as f:
-                f.write(html)
-
-    # 复制 CNAME (只在根目录)
-    if os.path.exists("CNAME"): shutil.copy("CNAME", f"{base_output_dir}/CNAME")
+            <table class="comparison-table">
+                <thead><tr>
+    """
     
-    # 简单生成英文首页 (为了不报错，首页暂时只做英文，或者你可以复制逻辑做多语言首页)
-    # 这里为了稳妥，我们生成一个英文首页
-    tpl_index = env.get_template('index.html')
-    # 首页数据我们只拿英文的
-    en_pages = []
-    for index, row in df.iterrows():
-        if row['Tool_Name'] == hero: continue
-        slug = f"{hero.lower()}-vs-{row['Tool_Name'].lower().replace(' ', '-')}"
-        en_pages.append({'title': f"{hero} vs {row['Tool_Name']}", 'link': f"{slug}.html"})
-        
-    with open(f"{base_output_dir}/index.html", "w", encoding="utf-8") as f:
-        f.write(tpl_index.render(config=config, pages=en_pages, trans=TRANSLATIONS['en']))
+    # 生成表头 (过滤掉 Link 和 Description)
+    for h in headers:
+        if h not in ['Affiliate_Link', 'Description', 'Badge']:
+            html_content += f"<th>{h.replace('_', ' ')}</th>"
+    html_content += "<th>Action</th></tr></thead><tbody>"
+    
+    # 生成行
+    for row in rows:
+        html_content += "<tr>"
+        # 假设倒数第2列是链接 (根据标准CSV结构: Provider,Price,Server,Logs,Stream,MoneyBack,Link,Badge)
+        # 安全起见，我们通过查找 Affiliate_Link 的索引来定位
+        try:
+            link_idx = headers.index('Affiliate_Link')
+            link = row[link_idx]
+        except:
+            link = "#"
 
-    print("✅ Full Site Build Complete.")
+        for i, cell in enumerate(row):
+            col_name = headers[i]
+            if col_name in ['Affiliate_Link', 'Description', 'Badge']: continue
+            
+            # 渲染 Tag
+            display = cell
+            if cell.lower() in ['yes', 'true', 'netflix', 'disney+']:
+                display = f'<span class="tag tag-green">{cell}</span>'
+            elif cell.lower() in ['no', 'false']:
+                display = f'<span class="tag tag-red">{cell}</span>'
+            
+            html_content += f"<td>{display}</td>"
+        
+        html_content += f'<td><a href="{link}" target="_blank" class="btn">Check Deal</a></td></tr>'
+
+    html_content += "</tbody></table></div></body></html>"
+    
+    # 核心修正：输出文件名必须是 index.html
+    with open('index.html', 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    print("✅ VPN index.html generated!")
+
+if __name__ == "__main__":
+    generate_vpn_site()
