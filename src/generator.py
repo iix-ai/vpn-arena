@@ -5,18 +5,32 @@ import datetime
 
 # 读取配置
 def load_config():
-    try:
-        with open('config.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"⚠️ Config not found or error: {e}")
-        return {
-            "site_name": "VPN Privacy Shield",
-            "domain": "https://vpn.ii-x.com",
-            "niche_keywords": "VPN, Privacy, Security",
-            "hero_title": "Protect Your Digital Life",
-            "primary_color": "#2563eb"
-        }
+    # 优先读取 config.json
+    if os.path.exists('config.json'):
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Config Error: {e}")
+    
+    # ⚠️ 关键修改：如果没找到配置，我们不再瞎猜 data.csv
+    # 而是根据当前目录下的文件自动判断是 VPN 还是 eSIM
+    default_data = "data.csv"
+    if os.path.exists(os.path.join('data', 'vpn_raw.csv')):
+        default_data = "vpn_raw.csv"
+    elif os.path.exists(os.path.join('data', 'esim_raw.csv')):
+        default_data = "esim_raw.csv"
+        
+    print(f"⚠️ Using Default Config. Auto-detected data file: {default_data}")
+    
+    return {
+        "site_name": "Site Config Missing",
+        "domain": "https://ii-x.com",
+        "niche_keywords": "Review",
+        "hero_title": "Comparison Site",
+        "primary_color": "#2563eb",
+        "data_file": default_data  # 这里变聪明了
+    }
 
 CONFIG = load_config()
 
@@ -146,3 +160,4 @@ def generate_site():
 
 if __name__ == "__main__":
     generate_site()
+
