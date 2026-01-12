@@ -1,11 +1,25 @@
 {
-  "site_name": "Privacy Shield | Top VPNs Compared",
-  "domain": "https://vpn.ii-x.com",
-  "niche_keywords": "VPN, Privacy, Streaming, Security",
-  "hero_title": "Stop Being Tracked Online",
-  "primary_color": "#2563eb",
-  "data_file": "vpn_raw.csv",
-  "icon": "🛡️",
-  "year": "2026",
-  "google_analytics_id": "G-WVXG2T67CD"
+  "site_name": "VPN Shield 2026",
+  "site_domain": "https://vpn.ii-x.com",
+  "google_analytics_id": "G-WVXG2T67CD",
+  "description": "The definitive ranking of the fastest and safest VPNs for 2026.",
+  
+  "affiliate_map": {
+    "NordVPN": "",
+    "ExpressVPN": "",
+    "Surfshark": "",
+    "CyberGhost": "",
+    "ProtonVPN": ""
+  },
+
+  "top_bar": {
+    "enabled": true,
+    "text": "🛡️ Cyber Security Alert: 68% OFF on Top Rated VPNs today!",
+    "link": "#ranking"
+  },
+
+  "legal": {
+    "disclosure": "Advertiser Disclosure: We are supported by our readers. We may earn a commission when you buy through links on our site.",
+    "company_name": "II-X AI Group"
+  }
 }
