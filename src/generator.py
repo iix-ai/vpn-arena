@@ -1,189 +1,128 @@
-import csv
 import os
+import pandas as pd
 import json
+from jinja2 import Environment, FileSystemLoader
 import datetime
+import shutil
 
-# ===========================
-# V3.1: 修复 GA 代码遗漏，增加配置读取灵活性
-# ===========================
-def load_config():
-    config = {
-        "site_name": "Comparison Site",
-        "domain": "https://ii-x.com",
-        "niche_keywords": "Review",
-        "hero_title": "Best Tools Compared",
-        "primary_color": "#2563eb",
-        "data_file": "data.csv",
-        "icon": "⚡", 
-        "year": "2026",
-        "google_analytics_id": "" 
-    }
-    
-    if os.path.exists('config.json'):
+# Tiandao VPN Generator v2.0 (Ported from Compare v8.0)
+class SiteGenerator:
+    def __init__(self):
+        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.data_path = os.path.join(self.base_dir, 'data', 'vpn_raw.csv') # 注意文件名
+        self.config_path = os.path.join(self.base_dir, 'config.json')
+        self.template_dir = os.path.join(self.base_dir, 'templates')
+        self.output_dir = os.path.join(self.base_dir, 'output')
+        self.static_dir = os.path.join(self.base_dir, 'static')
+        self.generated_urls = []
+        
+        # 加载配置
         try:
-            with open('config.json', 'r', encoding='utf-8') as f:
-                loaded = json.load(f)
-                config.update(loaded)
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+        except:
+            self.config = {}
+
+    def load_data(self):
+        print(f"📂 Loading VPN data...")
+        if not os.path.exists(self.data_path):
+            print("❌ Data file missing!")
+            return []
+        try:
+            # 适配 VPN CSV 格式
+            df = pd.read_csv(self.data_path, header=0, on_bad_lines='skip', encoding='utf-8')
+            df = df.fillna("Pending")
+            return df.to_dict('records')
         except Exception as e:
-            print(f"⚠️ Config Error: {e}")
+            print(f"❌ CSV Error: {e}")
+            return []
+
+    # 核心：佣金拦截器 (复用 Compare 逻辑)
+    def get_affiliate_link(self, provider_name, original_link):
+        if not self.config or 'affiliate_map' not in self.config:
+            return original_link
+        clean_name = str(provider_name).strip()
+        for key, link in self.config.get('affiliate_map', {}).items():
+            if key.lower() in clean_name.lower() and link: # 只有link不为空才替换
+                return link
+        return original_link
+
+    def generate_review_pages(self, vpns):
+        env = Environment(loader=FileSystemLoader(self.template_dir))
+        template = env.get_template('review.html') # 需要新建这个模板
+
+        print(f"📝 Generating {len(vpns)} review pages...")
+        for vpn in vpns:
+            # 替换链接
+            vpn['Affiliate_Link'] = self.get_affiliate_link(vpn.get('Provider'), vpn.get('Affiliate_Link', '#'))
             
-    if not os.path.exists('data'):
-        os.makedirs('data')
+            # 生成 Slug
+            name = str(vpn.get('Provider', 'unknown')).strip()
+            slug = f"{name.lower().replace(' ', '-')}-review"
+            filename = f"{slug}.html"
+            
+            # 渲染
+            html = template.render(
+                vpn=vpn,
+                config=self.config,
+                date=datetime.datetime.now().strftime("%B %Y")
+            )
+            
+            with open(os.path.join(self.output_dir, filename), 'w', encoding='utf-8') as f:
+                f.write(html)
+            self.generated_urls.append(filename)
+
+    def generate_index(self, vpns):
+        print("🏆 Generating Ranking Index...")
+        env = Environment(loader=FileSystemLoader(self.template_dir))
+        template = env.get_template('index.html')
         
-    return config
+        # 处理链接
+        for vpn in vpns:
+            vpn['Affiliate_Link'] = self.get_affiliate_link(vpn.get('Provider'), vpn.get('Affiliate_Link', '#'))
 
-CONFIG = load_config()
+        html = template.render(
+            vpns=vpns,
+            config=self.config,
+            date=datetime.datetime.now().strftime("%B %Y")
+        )
+        with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f:
+            f.write(html)
 
-def generate_site():
-    print(f"🔄 Building V3.1 Site: {CONFIG['site_name']}...")
-    
-    # --- GA 代码注入逻辑 ---
-    ga_script = ""
-    if CONFIG['google_analytics_id']:
-        ga_id = CONFIG['google_analytics_id']
-        ga_script = f"""<script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){{dataLayer.push(arguments);}}
-      gtag('js', new Date());
-      gtag('config', '{ga_id}');
-    </script>"""
+    def generate_sitemap(self):
+        print("🗺️ Generating Sitemap...")
+        base_url = self.config.get('site_domain', 'https://vpn.ii-x.com')
+        xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        xml += f'<url><loc>{base_url}/</loc><priority>1.0</priority></url>\n'
+        for url in self.generated_urls:
+            xml += f'<url><loc>{base_url}/{url}</loc><priority>0.8</priority></url>\n'
+        xml += '</urlset>'
+        with open(os.path.join(self.output_dir, "sitemap.xml"), 'w', encoding='utf-8') as f:
+            f.write(xml)
 
-    # --- 读取数据 ---
-    file_path = os.path.join('data', CONFIG.get('data_file', 'data.csv'))
-    rows = []
-    headers = []
-    
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            try:
-                headers = [h.strip() for h in next(reader)]
-                rows = list(reader)
-            except StopIteration:
-                pass
+    def copy_assets(self):
+        # 简单复制
+        if os.path.exists(self.static_dir):
+            target = os.path.join(self.output_dir, 'static')
+            if os.path.exists(target): shutil.rmtree(target)
+            shutil.copytree(self.static_dir, target)
+        # 生成 robots.txt
+        with open(os.path.join(self.output_dir, "robots.txt"), 'w') as f:
+            f.write("User-agent: *\nAllow: /")
 
-    # --- 准备 HTML 组件 ---
-    nav_html = f"""
-    <nav style="background:rgba(15,23,42,0.95); backdrop-filter:blur(10px); padding:15px; text-align:center; border-bottom:1px solid #334155; position:sticky; top:0; z-index:100;">
-        <a href="https://compare.ii-x.com" style="color:#e2e8f0; text-decoration:none; margin:0 10px; font-weight:600;">🤖 AI Tools</a>
-        <span style="color:#475569">|</span>
-        <a href="https://vpn.ii-x.com" style="color:{'#3b82f6' if 'VPN' in CONFIG['site_name'] else '#e2e8f0'}; text-decoration:none; margin:0 10px; font-weight:600;">🛡️ VPN</a>
-        <span style="color:#475569">|</span>
-        <a href="https://esim.ii-x.com" style="color:{'#10b981' if 'eSIM' in CONFIG['site_name'] else '#e2e8f0'}; text-decoration:none; margin:0 10px; font-weight:600;">📲 eSIM</a>
-    </nav>
-    """
-
-    footer_html = f"""
-    <footer style="background:#020617; border-top:1px solid #1e293b; padding:40px 0; margin-top:60px; text-align:center; color:#64748b; font-family:sans-serif; font-size:0.9rem;">
-        <div style="max-width:800px; margin:0 auto; padding:0 20px;">
-            <p>&copy; {CONFIG['year']} {CONFIG['site_name']}. All rights reserved.</p>
-            <div style="margin:20px 0;">
-                <a href="index.html" style="color:#94a3b8; text-decoration:none; margin:0 10px;">Home</a>
-                <a href="privacy.html" style="color:#94a3b8; text-decoration:none; margin:0 10px;">Privacy Policy</a>
-                <a href="terms.html" style="color:#94a3b8; text-decoration:none; margin:0 10px;">Terms of Use</a>
-            </div>
-            <p style="font-size:0.75rem; opacity:0.6; line-height:1.5;">
-                <strong>Disclosure:</strong> We are reader-supported. When you buy through links on our site, we may earn an affiliate commission.
-            </p>
-        </div>
-    </footer>
-    """
-
-    # --- CSS ---
-    css = f"""<style>
-        :root {{ --primary: {CONFIG['primary_color']}; --bg: #0f172a; --text: #f8fafc; }}
-        body {{ font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; }}
-        .btn {{ background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; display:inline-block; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; background: #1e293b; }}
-        th, td {{ padding: 15px; border-bottom: 1px solid #334155; text-align: left; }}
-        th {{ background: #020617; color: #94a3b8; text-transform: uppercase; font-size: 0.75rem; }}
-        tr:hover {{ background: #2d3748; }}
-    </style>"""
-    
-    # --- 表格生成 ---
-    table_html = "<table><thead><tr>"
-    hidden_cols = ['Affiliate_Link', 'Description', 'Badge', 'Link']
-    valid_headers = [h for h in headers if h not in hidden_cols]
-    
-    for h in valid_headers: table_html += f"<th>{h.replace('_', ' ')}</th>"
-    table_html += "<th>Action</th></tr></thead><tbody>"
-    
-    for row in rows:
-        if not row: continue
-        table_html += "<tr>"
-        link = "#"
-        if 'Affiliate_Link' in headers:
-            try: link = row[headers.index('Affiliate_Link')]
-            except: pass
+    def run(self):
+        if os.path.exists(self.output_dir): shutil.rmtree(self.output_dir)
+        os.makedirs(self.output_dir)
         
-        for idx, h in enumerate(headers):
-            if h in hidden_cols: continue
-            cell = row[idx] if idx < len(row) else ""
-            table_html += f"<td>{cell}</td>"
-        table_html += f'<td><a href="{link}" target="_blank" rel="nofollow sponsored" class="btn">Check Price</a></td></tr>'
-    table_html += "</tbody></table>"
-
-    # --- 首页 Index.html ---
-    index_content = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{CONFIG['site_name']} | Best of {CONFIG['year']}</title>
-    <meta name="description" content="Compare the best {CONFIG['niche_keywords']} options. Unbiased reviews and pricing tables.">
-    <link rel="canonical" href="{CONFIG['domain']}">
-    {ga_script} 
-    {css}
-</head>
-<body>
-    {nav_html}
-    <div style="max-width:1200px; margin:40px auto; padding:20px;">
-        <h1 style="text-align:center; font-size:2.5rem; margin-bottom:10px;">{CONFIG['hero_title']}</h1>
-        <p style="text-align:center; color:#94a3b8; margin-bottom:40px;">Last updated: {datetime.datetime.now().strftime('%B %Y')}</p>
-        <div style="overflow-x:auto; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3); border:1px solid #334155;">
-            {table_html}
-        </div>
-    </div>
-    {footer_html}
-</body>
-</html>"""
-    
-    with open('index.html', 'w', encoding='utf-8') as f:
-        f.write(index_content)
-
-    # --- Sitemap ---
-    sitemap_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-   <url>
-      <loc>{CONFIG['domain']}/</loc>
-      <lastmod>{datetime.datetime.now().strftime('%Y-%m-%d')}</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>1.0</priority>
-   </url>
-   <url>
-      <loc>{CONFIG['domain']}/privacy.html</loc>
-      <priority>0.5</priority>
-   </url>
-   <url>
-      <loc>{CONFIG['domain']}/terms.html</loc>
-      <priority>0.5</priority>
-   </url>
-</urlset>"""
-    with open('sitemap.xml', 'w', encoding='utf-8') as f:
-        f.write(sitemap_content)
-    
-    # --- Robots, Privacy, Terms ---
-    with open('robots.txt', 'w', encoding='utf-8') as f:
-        f.write(f"User-agent: *\nAllow: /\nSitemap: {CONFIG['domain']}/sitemap.xml")
-
-    with open('privacy.html', 'w', encoding='utf-8') as f:
-        f.write(f"<!DOCTYPE html><html><head><title>Privacy Policy</title>{ga_script}{css}</head><body>{nav_html}<div style='max-width:800px; margin:40px auto; padding:20px;'><h1>Privacy Policy</h1><p>We use cookies (Google Analytics) to improve experience.</p></div>{footer_html}</body></html>")
-    
-    with open('terms.html', 'w', encoding='utf-8') as f:
-        f.write(f"<!DOCTYPE html><html><head><title>Terms of Use</title>{ga_script}{css}</head><body>{nav_html}<div style='max-width:800px; margin:40px auto; padding:20px;'><h1>Terms of Use</h1><p>Standard terms apply.</p></div>{footer_html}</body></html>")
-
-    print("✅ All Files Generated with GA Code.")
+        vpns = self.load_data()
+        if not vpns: return
+            
+        self.generate_review_pages(vpns)
+        self.generate_index(vpns)
+        self.generate_sitemap()
+        self.copy_assets()
+        print("✅ VPN Build Complete.")
 
 if __name__ == "__main__":
-    generate_site()
+    generator = SiteGenerator()
+    generator.run()
