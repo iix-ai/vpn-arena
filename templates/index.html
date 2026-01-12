@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best VPN Services for {{ date }} - Speed & Security Tested</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* 简单内联样式，确保样式不丢失 */
+        body { font-family: sans-serif; background: #f8f9fa; margin: 0; color: #333; }
+        .top-bar { background: #d92d20; color: white; text-align: center; padding: 10px; font-weight: bold; }
+        .container { max-width: 1000px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #1a202c; }
+        
+        /* 排行榜样式 */
+        .ranking-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .ranking-table th { background: #edf2f7; padding: 15px; text-align: left; }
+        .ranking-table td { padding: 15px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        .rank-num { font-size: 1.5rem; font-weight: bold; color: #cbd5e0; }
+        .badge { background: #ebf8ff; color: #2b6cb0; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+        .btn-buy { display: inline-block; background: #38a169; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; }
+        .btn-read { color: #718096; text-decoration: none; font-size: 0.9rem; margin-left: 10px; }
+        
+        footer { text-align: center; margin-top: 40px; font-size: 0.85rem; color: #718096; }
+    </style>
+</head>
+<body>
+    {% if config.top_bar.enabled %}
+    <div class="top-bar">{{ config.top_bar.text }}</div>
+    {% endif %}
+
+    <div class="container">
+        <h1>🏆 Top Rated VPNs ({{ date }} Updated)</h1>
+        <p style="text-align: center; color: #666;">We tested 50+ VPNs for speed, privacy, and streaming.</p>
+
+        <table class="ranking-table">
+            <thead>
+                <tr>
+                    <th width="5%">#</th>
+                    <th width="30%">Provider</th>
+                    <th>Key Features</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vpn in vpns %}
+                <tr>
+                    <td class="rank-num">{{ loop.index }}</td>
+                    <td>
+                        <div style="font-weight: bold; font-size: 1.1rem;">{{ vpn.Provider }}</div>
+                        {% if loop.index == 1 %}<span class="badge">🏆 Best Overall</span>{% endif %}
+                        {% if loop.index == 2 %}<span class="badge">⚡ Fastest</span>{% endif %}
+                    </td>
+                    <td>
+                        <ul style="margin: 0; padding-left: 15px; font-size: 0.9rem; color: #555;">
+                            <li>Server: {{ vpn.Server_Count }}</li>
+                            <li>Logs: {{ vpn.No_Logs }}</li>
+                            <li>{{ vpn.Streaming_Support }}</li>
+                        </ul>
+                    </td>
+                    <td style="font-weight: bold; color: #d92d20;">{{ vpn.Price_Monthly }}</td>
+                    <td>
+                        <a href="{{ vpn.Affiliate_Link }}" class="btn-buy" target="_blank" rel="nofollow">Visit Site &rarr;</a>
+                        <br>
+                        <a href="{{ vpn.Provider|lower|replace(' ','-') }}-review.html" class="btn-read">Read Review</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <footer>
+            <div style="margin: 20px 0; opacity: 0.8;">{{ config.legal.disclosure }}</div>
+            <p>&copy; 2026 {{ config.site_name }}.</p>
+        </footer>
+    </div>
+</body>
+</html>
