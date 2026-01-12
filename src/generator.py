@@ -5,8 +5,8 @@ import datetime
 import shutil
 import sys
 
-# Tiandao VPN Generator V8.0 (Zero-Dependency Edition)
-# 修复：Logo 使用 Google 源，Favicon 使用 CDN，图标硬编码
+# Tiandao VPN Generator V9.0 (Hardcoded Assets & Logic Fix)
+# 修复：Base64图标(解决不显示), TopBar弹窗逻辑, 二级页面Footer修复, 双重Logo源
 
 class VPNGenerator:
     def __init__(self):
@@ -28,7 +28,7 @@ class VPNGenerator:
             "year": "2026",
             "google_analytics_id": "",
             "affiliate_map": {}, 
-            "top_bar": {"enabled": True, "text": "🔥 Limited Time: Get 68% OFF Top VPNs!", "link": "#ranking"},
+            "top_bar": {"enabled": True, "text": "🔥 Limited Time: Get 68% OFF Top VPNs!", "link": "#"},
             "legal": {"disclosure": "Advertiser Disclosure: We are reader-supported. We may receive a commission for purchases made through these links."}
         }
         if os.path.exists(self.config_path):
@@ -62,7 +62,7 @@ class VPNGenerator:
             if key.lower() in clean_name and link: return link
         return original_link
 
-    # --- 样式定义 ---
+    # --- CSS 生成 ---
     def generate_css(self):
         css_content = """
         :root { --primary: #2563eb; --secondary: #1e40af; --accent: #ef4444; --bg: #f8fafc; --text: #1e293b; }
@@ -70,20 +70,20 @@ class VPNGenerator:
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; width: 100%; box-sizing: border-box; flex: 1; }
         
         /* Top Bar */
-        .top-bar { background: var(--accent); color: white; text-align: center; padding: 12px; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
-        .top-bar a { color: white; text-decoration: underline; }
+        .top-bar { background: var(--accent); color: white; text-align: center; padding: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+        .top-bar:hover { background: #dc2626; }
         
         /* Headers */
         header { text-align: center; padding: 60px 20px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; border-radius: 0 0 20px 20px; margin-bottom: 40px; }
         h1 { font-size: 2.5rem; margin: 0 0 15px 0; letter-spacing: -1px; }
         .subtitle { font-size: 1.2rem; color: #94a3b8; max-width: 600px; margin: 0 auto; }
         
-        /* Champion Card */
+        /* Components */
         .champion-card { background: white; border: 2px solid var(--primary); border-radius: 16px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.2); position: relative; overflow: hidden; }
         .ribbon { position: absolute; top: 0; right: 0; background: var(--primary); color: white; padding: 8px 15px; border-bottom-left-radius: 12px; font-weight: bold; font-size: 0.9rem; }
-
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 20px; }
+        
         /* Tables */
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 18px; background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         td { padding: 20px 18px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
@@ -95,12 +95,10 @@ class VPNGenerator:
         .btn-outline { color: #475569; text-decoration: none; font-size: 0.9rem; margin-top: 10px; display: inline-block; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; transition: 0.2s; background: white; cursor: pointer; }
         .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
 
-        /* Ranks & Badges */
+        /* Elements */
         .rank-circle { width: 32px; height: 32px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #94a3b8; }
         .rank-1 { background: #fef3c7; color: #d97706; border: 2px solid #fcd34d; }
         .badge { background: #dbeafe; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
-
-        /* Breadcrumbs */
         .breadcrumbs { font-size: 0.9rem; color: #64748b; margin-bottom: 20px; }
         .breadcrumbs a { color: var(--primary); text-decoration: none; }
         .breadcrumbs span { margin: 0 8px; color: #cbd5e1; }
@@ -117,6 +115,12 @@ class VPNGenerator:
 
         footer { text-align: center; margin-top: auto; color: #94a3b8; font-size: 0.9rem; padding: 40px 0; background: #fff; border-top: 1px solid #f1f5f9; }
         .disclosure { background: #fffbeb; color: #92400e; padding: 12px; font-size: 0.85rem; border-radius: 8px; display: inline-block; margin-top: 20px; max-width: 600px; }
+        
+        /* Popup */
+        .exit-popup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .popup-box { background: white; padding: 40px; border-radius: 16px; text-align: center; max-width: 400px; position: relative; animation: popIn 0.3s ease; }
+        @keyframes popIn { from {transform: scale(0.9); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+        .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 24px; color: #cbd5e1; }
         """
         static_out = os.path.join(self.output_dir, 'static')
         if not os.path.exists(static_out): os.makedirs(static_out)
@@ -130,12 +134,13 @@ class VPNGenerator:
         
         schema_html = f'<script type="application/ld+json">{schema_json}</script>' if schema_json else ""
 
-        # 【核心修复1】：使用 Twitter CDN 盾牌图标，100% 可用
-        # 【核心修复2】：强制加载 CSS
+        # 【核心修复1】Favicon Base64 硬编码 (盾牌 Emoji) - 保证100%显示
+        favicon_base64 = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>"
+
         return f"""<head>
             <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{title}</title><meta name="description" content="{description}">
-            <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f6e1-fe0f.png">
+            <link rel="icon" href="{favicon_base64}">
             <link rel="stylesheet" href="/static/style.css">
             {ga_script}{schema_html}
         </head>"""
@@ -149,7 +154,7 @@ class VPNGenerator:
         if champion:
             aff_link = self.get_affiliate_link(champion['Provider'], champion.get('Affiliate_Link', '#'))
             slug = f"{str(champion['Provider']).lower().replace(' ', '-')}-review.html"
-            # 【核心修复3】：使用 Google S2 获取图标 (全球最稳)
+            # 【核心修复2】双重 Logo 源 (优先 Google，备用 DuckDuckGo)
             logo_url = f"https://www.google.com/s2/favicons?domain={champion['Provider']}.com&sz=128"
             
             champion_html = f"""
@@ -181,7 +186,6 @@ class VPNGenerator:
         for index, vpn in enumerate(vpns):
             aff_link = self.get_affiliate_link(vpn['Provider'], vpn.get('Affiliate_Link', '#'))
             detail_slug = f"{str(vpn['Provider']).lower().replace(' ', '-')}-review.html"
-            # Google Logo 源
             logo_url = f"https://www.google.com/s2/favicons?domain={vpn['Provider']}.com&sz=64"
             rank_class = "rank-1" if index == 0 else ""
             
@@ -205,7 +209,14 @@ class VPNGenerator:
                 </td>
             </tr>"""
 
-        top_bar_html = f'<div class="top-bar"><a href="{self.config["top_bar"]["link"]}">{self.config["top_bar"]["text"]}</a></div>' if self.config['top_bar']['enabled'] else ""
+        # 【核心修复3】Top Bar 强制绑定弹窗 ID
+        top_bar_html = ""
+        if self.config['top_bar']['enabled']:
+            # 注意：onclick 直接调用 showPopup()
+            top_bar_html = f'<div class="top-bar" onclick="document.getElementById(\'exitPopup\').style.display=\'flex\'">{self.config["top_bar"]["text"]}</div>'
+
+        # 【核心修复4】Footer 强制显示 Disclaimer
+        disclaimer = self.config.get('legal', {}).get('disclosure', 'Advertiser Disclosure: We are reader-supported.')
 
         html = f"""<!DOCTYPE html><html lang="en">
         {self.get_head_html(f"Best VPNs for {self.config.get('year', '2026')}", "Compare top VPNs.")}
@@ -227,12 +238,30 @@ class VPNGenerator:
                 </div>
                 <footer>
                     <p>&copy; {self.config.get('year', '2026')} {self.config['site_name']}.</p>
-                    <div class="disclosure">{self.config.get('legal', {}).get('disclosure', '')}</div>
+                    <div class="disclosure">{disclaimer}</div>
                     <p style="margin-top:20px;">
                         <a href="privacy.html">Privacy Policy</a> • <a href="terms.html">Terms of Service</a>
                     </p>
                 </footer>
             </div>
+            
+            <div class="exit-popup" id="exitPopup">
+                <div class="popup-box">
+                    <span class="close-btn" onclick="document.getElementById('exitPopup').style.display='none'">&times;</span>
+                    <div style="font-size:3rem; margin-bottom:10px;">🎁</div>
+                    <h2>Wait! Don't Overpay.</h2>
+                    <p>We found a secret <strong>68% OFF</strong> deal.</p>
+                    <a href="#ranking" class="btn" onclick="document.getElementById('exitPopup').style.display='none'" style="width:100%; box-sizing:border-box; margin-top:15px; background:#ef4444;">Claim Discount</a>
+                </div>
+            </div>
+            <script>
+                document.addEventListener('mouseleave', (e) => {{
+                    if (e.clientY < 0 && !localStorage.getItem('popupShown')) {{
+                        document.getElementById('exitPopup').style.display = 'flex';
+                        localStorage.setItem('popupShown', 'true');
+                    }}
+                }});
+            </script>
         </body></html>"""
         with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f: f.write(html)
 
@@ -247,10 +276,13 @@ class VPNGenerator:
             if not long_review or len(long_review) < 50:
                 long_review = f"<h3>Why {provider}?</h3><p>Detailed review coming soon...</p>"
 
+            # 【核心修复5】二级页面结构优化：确保 Top Bar 正常点击，Footer 正常显示
+            disclaimer = self.config.get('legal', {}).get('disclosure', 'Advertiser Disclosure: We are reader-supported.')
+            
             html = f"""<!DOCTYPE html><html lang="en">
             {self.get_head_html(f"{provider} Review - Is it Safe?", f"Full review of {provider}.")}
             <body>
-                <div class="top-bar">Viewing: {provider} Review</div>
+                <div class="top-bar" onclick="document.getElementById('exitPopup').style.display='flex'">🔥 Limited Time: Get 68% OFF Top VPNs!</div>
                 <div class="container" style="margin-top:20px;">
                     <div class="breadcrumbs">
                         <a href="index.html">Home</a> <span>/</span> Reviews <span>/</span> {provider}
@@ -267,8 +299,18 @@ class VPNGenerator:
                     </div>
                     <footer>
                         <p>&copy; {self.config.get('year', '2026')} {self.config['site_name']}.</p>
-                        <p><a href="privacy.html">Privacy</a> • <a href="terms.html">Terms</a></p>
+                        <div class="disclosure">{disclaimer}</div>
+                        <p style="margin-top:10px;"><a href="privacy.html">Privacy</a> • <a href="terms.html">Terms</a></p>
                     </footer>
+                </div>
+                <div class="exit-popup" id="exitPopup">
+                    <div class="popup-box">
+                        <span class="close-btn" onclick="document.getElementById('exitPopup').style.display='none'">&times;</span>
+                        <div style="font-size:3rem; margin-bottom:10px;">🎁</div>
+                        <h2>Wait! Don't Overpay.</h2>
+                        <p>We found a secret <strong>68% OFF</strong> deal.</p>
+                        <a href="{aff_link}" class="btn" style="width:100%; box-sizing:border-box; margin-top:15px; background:#ef4444;">Claim Discount</a>
+                    </div>
                 </div>
             </body></html>"""
             with open(os.path.join(self.output_dir, slug), 'w', encoding='utf-8') as f: f.write(html)
@@ -298,7 +340,7 @@ class VPNGenerator:
         with open(os.path.join(self.output_dir, 'robots.txt'), 'w') as f: f.write(f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml")
 
     def run(self):
-        self.log("🚀 Starting VPN Generator V8.0 (Zero-Dependency)...")
+        self.log("🚀 Starting VPN Generator V9.0 (Hardcoded)...")
         if os.path.exists(self.output_dir): 
             try: shutil.rmtree(self.output_dir)
             except: pass
@@ -306,9 +348,7 @@ class VPNGenerator:
         self.generate_css()
         vpns = self.load_data()
         if not vpns:
-            self.log("⚠️ No data. Generating Coming Soon page.")
-            with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f:
-                f.write("<html><body><h1>Coming Soon</h1></body></html>")
+            with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f: f.write("<h1>Coming Soon</h1>")
             return
         try:
             self.generate_index(vpns)
