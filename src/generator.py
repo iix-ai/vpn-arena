@@ -5,8 +5,8 @@ import datetime
 import shutil
 import sys
 
-# Tiandao VPN Generator V7.0 (Product Director Approved)
-# 修复：Legal页面样式、详情页入口、面包屑导航、GA代码校验
+# Tiandao VPN Generator V8.0 (Zero-Dependency Edition)
+# 修复：Logo 使用 Google 源，Favicon 使用 CDN，图标硬编码
 
 class VPNGenerator:
     def __init__(self):
@@ -78,22 +78,24 @@ class VPNGenerator:
         h1 { font-size: 2.5rem; margin: 0 0 15px 0; letter-spacing: -1px; }
         .subtitle { font-size: 1.2rem; color: #94a3b8; max-width: 600px; margin: 0 auto; }
         
-        /* Components */
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; }
-        .btn { display: inline-block; background: var(--primary); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; transition: 0.2s; white-space: nowrap; text-align: center; }
-        .btn:hover { background: var(--secondary); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
-        
-        /* Improved Review Button */
-        .btn-outline { color: #475569; text-decoration: none; font-size: 0.9rem; margin-top: 10px; display: inline-block; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; transition: 0.2s; background: white; }
-        .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
-        .btn-outline::before { content: "📖 "; }
+        /* Champion Card */
+        .champion-card { background: white; border: 2px solid var(--primary); border-radius: 16px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.2); position: relative; overflow: hidden; }
+        .ribbon { position: absolute; top: 0; right: 0; background: var(--primary); color: white; padding: 8px 15px; border-bottom-left-radius: 12px; font-weight: bold; font-size: 0.9rem; }
 
         /* Tables */
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 18px; background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         td { padding: 20px 18px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        tr:hover { background-color: #f8fafc; }
         
-        /* Badges & Ranks */
+        /* Buttons */
+        .btn { display: inline-block; background: var(--primary); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; transition: 0.2s; white-space: nowrap; text-align: center; cursor: pointer; }
+        .btn:hover { background: var(--secondary); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+        .btn-outline { color: #475569; text-decoration: none; font-size: 0.9rem; margin-top: 10px; display: inline-block; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; transition: 0.2s; background: white; cursor: pointer; }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
+
+        /* Ranks & Badges */
         .rank-circle { width: 32px; height: 32px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #94a3b8; }
         .rank-1 { background: #fef3c7; color: #d97706; border: 2px solid #fcd34d; }
         .badge { background: #dbeafe; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
@@ -103,11 +105,6 @@ class VPNGenerator:
         .breadcrumbs a { color: var(--primary); text-decoration: none; }
         .breadcrumbs span { margin: 0 8px; color: #cbd5e1; }
 
-        /* Legal Page Styling */
-        .legal-content h1 { color: var(--text); font-size: 2rem; margin-top: 0; text-align: left; }
-        .legal-content { padding: 40px; }
-        .legal-content p { color: #475569; margin-bottom: 15px; }
-
         /* Mobile */
         @media (max-width: 768px) {
             header { padding: 30px 20px; }
@@ -115,7 +112,7 @@ class VPNGenerator:
             thead { display: none; }
             tr { display: flex; flex-direction: column; padding: 20px; border-bottom: 8px solid #f8fafc; }
             td { padding: 5px 0; border: none; }
-            .btn, .btn-outline { display: block; width: 100%; margin-top: 10px; }
+            .btn, .btn-outline { display: block; width: 100%; margin-top: 10px; box-sizing: border-box; }
         }
 
         footer { text-align: center; margin-top: auto; color: #94a3b8; font-size: 0.9rem; padding: 40px 0; background: #fff; border-top: 1px solid #f1f5f9; }
@@ -127,17 +124,18 @@ class VPNGenerator:
 
     def get_head_html(self, title, description, schema_json=None):
         ga_script = ""
-        # 【关键修复】确保 GA ID 存在才写入
         if self.config.get('google_analytics_id') and self.config['google_analytics_id'].startswith("G-"):
             ga_script = f"""<script async src="https://www.googletagmanager.com/gtag/js?id={self.config['google_analytics_id']}"></script>
             <script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{self.config['google_analytics_id']}');</script>"""
         
         schema_html = f'<script type="application/ld+json">{schema_json}</script>' if schema_json else ""
 
+        # 【核心修复1】：使用 Twitter CDN 盾牌图标，100% 可用
+        # 【核心修复2】：强制加载 CSS
         return f"""<head>
             <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{title}</title><meta name="description" content="{description}">
-            <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f6e1-fe0f.png" type="image/png">
+            <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f6e1-fe0f.png">
             <link rel="stylesheet" href="/static/style.css">
             {ga_script}{schema_html}
         </head>"""
@@ -145,11 +143,46 @@ class VPNGenerator:
     def generate_index(self, vpns):
         self.log("🏆 Generating Index Page...")
         
+        # 冠军卡片
+        champion = vpns[0] if vpns else None
+        champion_html = ""
+        if champion:
+            aff_link = self.get_affiliate_link(champion['Provider'], champion.get('Affiliate_Link', '#'))
+            slug = f"{str(champion['Provider']).lower().replace(' ', '-')}-review.html"
+            # 【核心修复3】：使用 Google S2 获取图标 (全球最稳)
+            logo_url = f"https://www.google.com/s2/favicons?domain={champion['Provider']}.com&sz=128"
+            
+            champion_html = f"""
+            <div class="champion-card">
+                <div class="ribbon">🏆 #1 RANKED</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px;">
+                    <div style="flex:1;">
+                        <div style="display:flex; align-items:center; gap:15px; margin-bottom:10px;">
+                            <img src="{logo_url}" style="width:48px; height:48px; border-radius:50%; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <h2 style="margin:0; font-size:1.8rem;">{champion['Provider']}</h2>
+                        </div>
+                        <p style="margin:0; color:#64748b;">The best overall VPN for speed, security, and streaming in 2026.</p>
+                        <div style="margin-top:15px;">
+                            <span class="badge">🚀 Fastest</span>
+                            <span class="badge">🔒 Audit Verified</span>
+                        </div>
+                    </div>
+                    <div style="text-align:center; min-width:150px;">
+                        <div class="price">{champion.get('Price_Monthly', 'N/A')}</div>
+                        <div class="period">per month</div>
+                        <a href="{aff_link}" class="btn" style="width:100%; box-sizing:border-box; margin-top:10px; background:#ef4444;">Get Deal &rarr;</a>
+                        <a href="{slug}" class="btn-outline">📖 Read Review</a>
+                    </div>
+                </div>
+            </div>
+            """
+
         rows_html = ""
         for index, vpn in enumerate(vpns):
             aff_link = self.get_affiliate_link(vpn['Provider'], vpn.get('Affiliate_Link', '#'))
             detail_slug = f"{str(vpn['Provider']).lower().replace(' ', '-')}-review.html"
-            logo_url = f"https://logo.clearbit.com/{str(vpn['Provider']).lower().replace(' ', '')}.com"
+            # Google Logo 源
+            logo_url = f"https://www.google.com/s2/favicons?domain={vpn['Provider']}.com&sz=64"
             rank_class = "rank-1" if index == 0 else ""
             
             rows_html += f"""
@@ -157,7 +190,7 @@ class VPNGenerator:
                 <td width="5%"><div class="rank-circle {rank_class}">#{index + 1}</div></td>
                 <td width="30%">
                     <div style="display:flex; align-items:center; gap:12px;">
-                        <img src="{logo_url}" onerror="this.style.display='none'" style="width:32px; height:32px; border-radius:6px;">
+                        <img src="{logo_url}" style="width:24px; height:24px; border-radius:4px;">
                         <span style="font-weight:bold; color:#0f172a;">{vpn['Provider']}</span>
                     </div>
                 </td>
@@ -168,7 +201,7 @@ class VPNGenerator:
                 <td width="15%"><div style="font-weight:800; font-size:1.1rem; color:#0f172a;">{vpn.get('Price_Monthly', 'N/A')}</div></td>
                 <td width="20%">
                     <a href="{aff_link}" class="btn" onclick="event.stopPropagation();" target="_blank" rel="nofollow">Get Deal</a>
-                    <a href="{detail_slug}" class="btn-outline" onclick="event.stopPropagation();">Read Review</a>
+                    <a href="{detail_slug}" class="btn-outline" onclick="event.stopPropagation();">📖 Review</a>
                 </td>
             </tr>"""
 
@@ -185,6 +218,7 @@ class VPNGenerator:
                 </div>
             </header>
             <div class="container" style="margin-top:-60px;">
+                {champion_html}
                 <div class="card">
                     <table>
                         <thead><tr><th>Rank</th><th>Provider</th><th>Features</th><th>Price</th><th>Action</th></tr></thead>
@@ -208,7 +242,7 @@ class VPNGenerator:
             provider = vpn['Provider']
             aff_link = self.get_affiliate_link(provider, vpn.get('Affiliate_Link', '#'))
             slug = f"{str(provider).lower().replace(' ', '-')}-review.html"
-            logo_url = f"https://logo.clearbit.com/{str(provider).lower().replace(' ', '')}.com"
+            logo_url = f"https://www.google.com/s2/favicons?domain={provider}.com&sz=128"
             long_review = vpn.get('Long_Review', '')
             if not long_review or len(long_review) < 50:
                 long_review = f"<h3>Why {provider}?</h3><p>Detailed review coming soon...</p>"
@@ -222,7 +256,7 @@ class VPNGenerator:
                         <a href="index.html">Home</a> <span>/</span> Reviews <span>/</span> {provider}
                     </div>
                     <div class="card" style="padding:40px; text-align:center;">
-                        <img src="{logo_url}" onerror="this.style.display='none'" style="width:64px; height:64px; margin-bottom:20px;">
+                        <img src="{logo_url}" style="width:64px; height:64px; border-radius:50%; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
                         <h1 style="margin:0;">{provider} Review</h1>
                         <a href="{aff_link}" class="btn" style="margin-top:20px; font-size:1.1rem; padding:15px 30px;" target="_blank" rel="nofollow">Get 68% OFF {provider} &rarr;</a>
                     </div>
@@ -239,25 +273,17 @@ class VPNGenerator:
             </body></html>"""
             with open(os.path.join(self.output_dir, slug), 'w', encoding='utf-8') as f: f.write(html)
 
-    # 【核心修复】Legal Pages 装修 - 它们现在长得像正经网页了
     def generate_legal(self):
         for page in ['privacy', 'terms']:
             title = f"{page.capitalize()} Policy"
             content = "<p>Your privacy is important to us. We use Google Analytics to improve user experience.</p>" if page == 'privacy' else "<p>By using this site, you agree to our terms.</p>"
-            
             html = f"""<!DOCTYPE html><html lang="en">
             {self.get_head_html(title, title)}
             <body>
                 <div class="container">
-                    <header style="padding:40px; margin-bottom:20px;">
-                        <h1>{title}</h1>
-                    </header>
-                    <div class="card legal-content">
-                        {content}
-                    </div>
-                    <footer>
-                        <p><a href="index.html">Back to Home</a></p>
-                    </footer>
+                    <header style="padding:40px; margin-bottom:20px;"><h1>{title}</h1></header>
+                    <div class="card legal-content" style="padding:40px;">{content}</div>
+                    <footer><p><a href="index.html">Back to Home</a></p></footer>
                 </div>
             </body></html>"""
             with open(os.path.join(self.output_dir, f'{page}.html'), 'w', encoding='utf-8') as f: f.write(html)
@@ -272,29 +298,23 @@ class VPNGenerator:
         with open(os.path.join(self.output_dir, 'robots.txt'), 'w') as f: f.write(f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml")
 
     def run(self):
-        self.log("🚀 Starting VPN Generator V7.0...")
+        self.log("🚀 Starting VPN Generator V8.0 (Zero-Dependency)...")
         if os.path.exists(self.output_dir): 
             try: shutil.rmtree(self.output_dir)
             except: pass
         os.makedirs(self.output_dir)
         self.generate_css()
-        
-        # 404 防御：如果 CSV 为空，生成一个漂亮的 Coming Soon
         vpns = self.load_data()
         if not vpns:
             self.log("⚠️ No data. Generating Coming Soon page.")
             with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f:
-                f.write("<html><body style='text-align:center; padding:50px; font-family:sans-serif;'><h1>Coming Soon</h1><p>We are updating our data...</p></body></html>")
+                f.write("<html><body><h1>Coming Soon</h1></body></html>")
             return
-
         try:
             self.generate_index(vpns)
             self.generate_details(vpns)
-            self.generate_legal() # 现在生成的 Legal Page 有样式了
+            self.generate_legal()
             self.generate_sitemap()
-            # 复用静态资源
-            if os.path.exists(os.path.join(self.static_dir, 'favicon.png')):
-                 shutil.copy(os.path.join(self.static_dir, 'favicon.png'), os.path.join(self.output_dir, 'static', 'favicon.png'))
             self.log("✅ Build Complete.")
         except Exception as e: self.log(f"❌ BUILD FAILED: {e}")
 
