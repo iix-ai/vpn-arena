@@ -69,20 +69,9 @@ class VPNGenerator:
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; width: 100%; box-sizing: border-box; flex: 1; }
         
-        /* Top Bar - 冻结 + 鼠标滑过触发区域 */
-        .top-bar { 
-                  position: sticky; /* 关键：粘性定位 */
-                  top: 0;           /* 紧贴顶部 */
-                  z-index: 1000;    /* 保证压在所有内容上面 */
-                  background: var(--accent); 
-                  color: white; 
-                  text-align: center; 
-                  padding: 12px; 
-                  font-weight: 700; 
-                  font-size: 14px; 
-                  letter-spacing: 0.5px; 
-                  cursor: pointer; 
-                  transition: background 0.2s; }
+        /* Top Bar - 鼠标滑过触发区域 */
+        .top-bar { background: var(--accent); color: white; text-align: center; padding: 12px; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; cursor: pointer; transition: background 0.2s; }
+        .top-bar:hover { background: #dc2626; text-decoration: underline; }
         
         /* Headers */
         header { text-align: center; padding: 60px 20px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; border-radius: 0 0 20px 20px; margin-bottom: 40px; }
@@ -369,4 +358,3 @@ class VPNGenerator:
 if __name__ == "__main__":
     gen = VPNGenerator()
     gen.run()
-
