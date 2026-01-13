@@ -4,9 +4,10 @@ import json
 import datetime
 import shutil
 import sys
+import base64
 
-# Tiandao VPN Generator V8.1 (Interaction Fix)
-# 基于 V8.0 稳定版 -> 修复：Top Bar 鼠标滑过即弹窗 (Mouseover)
+# Tiandao VPN Generator V4.0 (Exit Intent & Logic Sync)
+# 核心升级：移植 eSIM 站点的 V4.0 逻辑 (Mouseleave Top Edge + LocalStorage Lock)
 
 class VPNGenerator:
     def __init__(self):
@@ -17,6 +18,26 @@ class VPNGenerator:
         self.static_dir = os.path.join(self.base_dir, 'static')
         self.generated_urls = []
         self.config = self.load_config()
+
+        # VPN 域名修正字典 (确保 Logo 能抓取到)
+        self.domain_map = {
+            "Private Internet Access": "privateinternetaccess.com",
+            "PIA": "privateinternetaccess.com",
+            "PureVPN": "purevpn.com",
+            "IPVanish": "ipvanish.com",
+            "ProtonVPN": "protonvpn.com",
+            "Windscribe": "windscribe.com",
+            "TunnelBear": "tunnelbear.com",
+            "Hide.me": "hide.me",
+            "Mullvad": "mullvad.net",
+            "Atlas VPN": "atlasvpn.com",
+            "StrongVPN": "strongvpn.com",
+            "PrivadoVPN": "privadovpn.com",
+            "NordVPN": "nordvpn.com",
+            "ExpressVPN": "expressvpn.com",
+            "Surfshark": "surfshark.com",
+            "CyberGhost": "cyberghostvpn.com"
+        }
 
     def log(self, message):
         print(f"[VPN-GEN] {message}")
@@ -61,16 +82,75 @@ class VPNGenerator:
         for key, link in mapping.items():
             if key.lower() in clean_name and link: return link
         return original_link
+    
+    def get_real_domain(self, provider_name):
+        clean = str(provider_name).strip()
+        if clean in self.domain_map:
+            return self.domain_map[clean]
+        return f"{clean.lower().replace(' ', '')}.com"
 
-    # --- 样式定义 ---
+    # --- 【核心逻辑】全站统一的“离去挽留”脚本 ---
+    def get_common_script(self):
+        return """
+        <script>
+            // 1. 定义核心弹窗函数
+            function triggerExitPopup() {
+                // 严谨判断：如果 localStorage 里已经有记录，说明这人以前弹过了，坚决不弹第二次
+                if (localStorage.getItem('hasSeenExitPopup') === 'yes') {
+                    return; // 直接结束，不打扰用户
+                }
+                
+                // 如果没弹过，显示弹窗
+                var popup = document.getElementById('exitPopup');
+                if (popup) {
+                    popup.style.display = 'flex';
+                    // 立即写入记录：这人已经挽留过了
+                    localStorage.setItem('hasSeenExitPopup', 'yes');
+                }
+            }
+
+            // 2. 监听鼠标移出浏览器窗口 (Exit Intent)
+            // 无论页面滚动到哪里，只要鼠标穿过浏览器【上边缘】，e.clientY 都会小于 0
+            document.addEventListener('mouseleave', function(e) {
+                if (e.clientY < 0) {
+                    triggerExitPopup();
+                }
+            });
+
+            // 3. 关闭按钮逻辑
+            function closePopup() {
+                document.getElementById('exitPopup').style.display = 'none';
+            }
+            
+            // 4. (可选) 如果用户点击了 TopBar，也算触发一次挽留，避免重复
+            function topBarClick() {
+                triggerExitPopup();
+            }
+        </script>
+        """
+
     def generate_css(self):
         css_content = """
         :root { --primary: #2563eb; --secondary: #1e40af; --accent: #ef4444; --bg: #f8fafc; --text: #1e293b; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; width: 100%; box-sizing: border-box; flex: 1; }
         
-        /* Top Bar - 鼠标滑过触发区域 */
-        .top-bar { background: var(--accent); color: white; text-align: center; padding: 12px; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; cursor: pointer; transition: background 0.2s; }
+        /* Top Bar - 冻结 + 吸顶 */
+        .top-bar { 
+            position: sticky; 
+            top: 0; 
+            z-index: 9000; 
+            background: var(--accent); 
+            color: white; 
+            text-align: center; 
+            padding: 12px; 
+            font-weight: 700; 
+            font-size: 14px; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+            user-select: none; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        }
         .top-bar:hover { background: #dc2626; text-decoration: underline; }
         
         /* Headers */
@@ -116,8 +196,20 @@ class VPNGenerator:
         footer { text-align: center; margin-top: auto; color: #94a3b8; font-size: 0.9rem; padding: 40px 0; background: #fff; border-top: 1px solid #f1f5f9; }
         .disclosure { background: #fffbeb; color: #92400e; padding: 12px; font-size: 0.85rem; border-radius: 8px; display: inline-block; margin-top: 20px; max-width: 600px; }
         
-        /* Popup */
-        .exit-popup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        /* Popup - Position Fixed 保证无论滚到哪里都在屏幕中间 */
+        .exit-popup { 
+            display: none; 
+            position: fixed; /* 关键：固定在视口，不受滚动影响 */
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.8); 
+            z-index: 99999; /* 最高层级 */
+            justify-content: center; 
+            align-items: center; 
+            backdrop-filter: blur(5px); 
+        }
         .popup-box { background: white; padding: 40px; border-radius: 16px; text-align: center; max-width: 400px; position: relative; animation: popIn 0.3s ease; }
         @keyframes popIn { from {transform: scale(0.9); opacity: 0;} to {transform: scale(1); opacity: 1;} }
         .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 24px; color: #cbd5e1; }
@@ -153,7 +245,7 @@ class VPNGenerator:
         if champion:
             aff_link = self.get_affiliate_link(champion['Provider'], champion.get('Affiliate_Link', '#'))
             slug = f"{str(champion['Provider']).lower().replace(' ', '-')}-review.html"
-            logo_url = f"https://www.google.com/s2/favicons?domain={champion['Provider']}.com&sz=128"
+            logo_url = f"https://www.google.com/s2/favicons?domain={self.get_real_domain(champion['Provider'])}&sz=128"
             
             champion_html = f"""
             <div class="champion-card">
@@ -177,14 +269,13 @@ class VPNGenerator:
                         <a href="{slug}" class="btn-outline">📖 Read Review</a>
                     </div>
                 </div>
-            </div>
-            """
+            </div>"""
 
         rows_html = ""
         for index, vpn in enumerate(vpns):
             aff_link = self.get_affiliate_link(vpn['Provider'], vpn.get('Affiliate_Link', '#'))
             detail_slug = f"{str(vpn['Provider']).lower().replace(' ', '-')}-review.html"
-            logo_url = f"https://www.google.com/s2/favicons?domain={vpn['Provider']}.com&sz=64"
+            logo_url = f"https://www.google.com/s2/favicons?domain={self.get_real_domain(vpn['Provider'])}&sz=64"
             rank_class = "rank-1" if index == 0 else ""
             
             rows_html += f"""
@@ -207,10 +298,8 @@ class VPNGenerator:
                 </td>
             </tr>"""
 
-        # 【核心修复】Top Bar 逻辑：onmouseover = 弹窗
-        top_bar_html = ""
-        if self.config['top_bar']['enabled']:
-            top_bar_html = f'''<div class="top-bar" onmouseover="document.getElementById('exitPopup').style.display='flex'">{self.config["top_bar"]["text"]}</div>'''
+        # Top Bar 只保留点击触发，防止鼠标滑过误触
+        top_bar_html = f'''<div class="top-bar" onclick="topBarClick()">{self.config["top_bar"]["text"]}</div>''' if self.config['top_bar']['enabled'] else ""
 
         html = f"""<!DOCTYPE html><html lang="en">
         {self.get_head_html(f"Best VPNs for {self.config.get('year', '2026')}", "Compare top VPNs.")}
@@ -241,21 +330,14 @@ class VPNGenerator:
             
             <div class="exit-popup" id="exitPopup">
                 <div class="popup-box">
-                    <span class="close-btn" onclick="document.getElementById('exitPopup').style.display='none'">&times;</span>
+                    <span class="close-btn" onclick="closePopup()">&times;</span>
                     <div style="font-size:3rem; margin-bottom:10px;">🎁</div>
                     <h2>Wait! Don't Overpay.</h2>
                     <p>We found a secret <strong>68% OFF</strong> deal.</p>
-                    <a href="#ranking" class="btn" onclick="document.getElementById('exitPopup').style.display='none'" style="width:100%; box-sizing:border-box; margin-top:15px; background:#ef4444;">Claim Discount</a>
+                    <a href="#ranking" class="btn" onclick="closePopup()" style="width:100%; box-sizing:border-box; margin-top:15px; background:#ef4444;">Claim Discount</a>
                 </div>
             </div>
-            <script>
-                document.addEventListener('mouseleave', (e) => {{
-                    if (e.clientY < 0 && !localStorage.getItem('popupShown')) {{
-                        document.getElementById('exitPopup').style.display = 'flex';
-                        localStorage.setItem('popupShown', 'true');
-                    }}
-                }});
-            </script>
+            {self.get_common_script()}
         </body></html>"""
         with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f: f.write(html)
 
@@ -265,15 +347,14 @@ class VPNGenerator:
             provider = vpn['Provider']
             aff_link = self.get_affiliate_link(provider, vpn.get('Affiliate_Link', '#'))
             slug = f"{str(provider).lower().replace(' ', '-')}-review.html"
-            logo_url = f"https://www.google.com/s2/favicons?domain={provider}.com&sz=128"
+            logo_url = f"https://www.google.com/s2/favicons?domain={self.get_real_domain(provider)}&sz=128"
             long_review = vpn.get('Long_Review', '')
             if not long_review or len(long_review) < 50:
                 long_review = f"<h3>Why {provider}?</h3><p>Detailed review coming soon...</p>"
 
-            # 详情页顶部也加上滑过弹窗
-            top_bar_html = f'''<div class="top-bar" onmouseover="document.getElementById('exitPopup').style.display='flex'">🔥 Limited Time: Get 68% OFF Top VPNs!</div>'''
+            # 详情页 Top Bar
+            top_bar_html = f'''<div class="top-bar" onclick="topBarClick()">🔥 Limited Time: Get 68% OFF Top VPNs!</div>'''
             
-            # Disclosure
             disclaimer = self.config.get('legal', {}).get('disclosure', 'Advertiser Disclosure: We are reader-supported. We may receive a commission for purchases made through these links.')
 
             html = f"""<!DOCTYPE html><html lang="en">
@@ -302,13 +383,14 @@ class VPNGenerator:
                 </div>
                 <div class="exit-popup" id="exitPopup">
                     <div class="popup-box">
-                        <span class="close-btn" onclick="document.getElementById('exitPopup').style.display='none'">&times;</span>
+                        <span class="close-btn" onclick="closePopup()">&times;</span>
                         <div style="font-size:3rem; margin-bottom:10px;">🎁</div>
                         <h2>Wait! Don't Overpay.</h2>
                         <p>We found a secret <strong>68% OFF</strong> deal.</p>
                         <a href="{aff_link}" class="btn" style="width:100%; box-sizing:border-box; margin-top:15px; background:#ef4444;">Claim Discount</a>
                     </div>
                 </div>
+                {self.get_common_script()}
             </body></html>"""
             with open(os.path.join(self.output_dir, slug), 'w', encoding='utf-8') as f: f.write(html)
 
@@ -337,7 +419,7 @@ class VPNGenerator:
         with open(os.path.join(self.output_dir, 'robots.txt'), 'w') as f: f.write(f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml")
 
     def run(self):
-        self.log("🚀 Starting VPN Generator V8.1 (Interaction Fix)...")
+        self.log("🚀 Starting VPN Generator V4.0 (Exit Intent)...")
         if os.path.exists(self.output_dir): 
             try: shutil.rmtree(self.output_dir)
             except: pass
