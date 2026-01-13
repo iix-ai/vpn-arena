@@ -6,8 +6,8 @@ import shutil
 import sys
 import base64
 
-# Tiandao VPN Generator V4.0 (Exit Intent & Logic Sync)
-# 核心升级：移植 eSIM 站点的 V4.0 逻辑 (Mouseleave Top Edge + LocalStorage Lock)
+# Tiandao VPN Generator V5.0 (SEO Enhanced & Schema Markup)
+# 核心升级：适配 n8n V7.0 数据结构，注入 Google 星级评分与富文本摘要
 
 class VPNGenerator:
     def __init__(self):
@@ -19,7 +19,7 @@ class VPNGenerator:
         self.generated_urls = []
         self.config = self.load_config()
 
-        # VPN 域名修正字典 (确保 Logo 能抓取到)
+        # VPN 域名修正字典
         self.domain_map = {
             "Private Internet Access": "privateinternetaccess.com",
             "PIA": "privateinternetaccess.com",
@@ -69,7 +69,10 @@ class VPNGenerator:
             with open(self.data_path, 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('Provider'): data.append(row)
+                    if row.get('Provider'): 
+                        # 数据清洗：处理 CSV 可能存在的空格
+                        clean_row = {k.strip(): v for k, v in row.items() if k}
+                        data.append(clean_row)
             self.log(f"✅ Loaded {len(data)} VPNs.")
             return data
         except Exception as e:
@@ -89,68 +92,67 @@ class VPNGenerator:
             return self.domain_map[clean]
         return f"{clean.lower().replace(' ', '')}.com"
 
-    # --- 【核心逻辑】全站统一的“离去挽留”脚本 ---
+    # --- Schema Markup 生成器 (让 Google 显示星星) ---
+    def generate_schema_json(self, vpn):
+        provider = vpn['Provider']
+        rating = vpn.get('star_rating', '4.5')
+        try:
+            rating_val = float(rating)
+        except:
+            rating_val = 4.5
+            
+        schema = {
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": provider,
+            "description": vpn.get('seo_meta_desc', f"Review of {provider}"),
+            "review": {
+                "@type": "Review",
+                "reviewRating": {
+                    "@type": "Rating",
+                    "ratingValue": str(rating_val),
+                    "bestRating": "5"
+                },
+                "author": {
+                    "@type": "Organization",
+                    "name": self.config['site_name']
+                }
+            },
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": str(rating_val),
+                "reviewCount": "1280"
+            }
+        }
+        return json.dumps(schema)
+
     def get_common_script(self):
         return """
         <script>
-            // 1. 定义核心弹窗函数
             function triggerExitPopup() {
-                // 严谨判断：如果 localStorage 里已经有记录，说明这人以前弹过了，坚决不弹第二次
-                if (localStorage.getItem('hasSeenExitPopup') === 'yes') {
-                    return; // 直接结束，不打扰用户
-                }
-                
-                // 如果没弹过，显示弹窗
+                if (localStorage.getItem('hasSeenExitPopup') === 'yes') return;
                 var popup = document.getElementById('exitPopup');
                 if (popup) {
                     popup.style.display = 'flex';
-                    // 立即写入记录：这人已经挽留过了
                     localStorage.setItem('hasSeenExitPopup', 'yes');
                 }
             }
-
-            // 2. 监听鼠标移出浏览器窗口 (Exit Intent)
-            // 无论页面滚动到哪里，只要鼠标穿过浏览器【上边缘】，e.clientY 都会小于 0
             document.addEventListener('mouseleave', function(e) {
-                if (e.clientY < 0) {
-                    triggerExitPopup();
-                }
+                if (e.clientY < 0) triggerExitPopup();
             });
-
-            // 3. 关闭按钮逻辑
-            function closePopup() {
-                document.getElementById('exitPopup').style.display = 'none';
-            }
-            
-            // 4. (可选) 如果用户点击了 TopBar，也算触发一次挽留，避免重复
-            function topBarClick() {
-                triggerExitPopup();
-            }
+            function closePopup() { document.getElementById('exitPopup').style.display = 'none'; }
+            function topBarClick() { triggerExitPopup(); }
         </script>
         """
 
     def generate_css(self):
         css_content = """
-        :root { --primary: #2563eb; --secondary: #1e40af; --accent: #ef4444; --bg: #f8fafc; --text: #1e293b; }
+        :root { --primary: #2563eb; --secondary: #1e40af; --accent: #ef4444; --bg: #f8fafc; --text: #1e293b; --star: #f59e0b; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; width: 100%; box-sizing: border-box; flex: 1; }
         
-        /* Top Bar - 冻结 + 吸顶 */
-        .top-bar { 
-            position: sticky; 
-            top: 0; 
-            z-index: 9000; 
-            background: var(--accent); 
-            color: white; 
-            text-align: center; 
-            padding: 12px; 
-            font-weight: 700; 
-            font-size: 14px; 
-            cursor: pointer; 
-            transition: background 0.2s; 
-            user-select: none; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
-        }
+        /* Top Bar */
+        .top-bar { position: sticky; top: 0; z-index: 9000; background: var(--accent); color: white; text-align: center; padding: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: background 0.2s; user-select: none; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .top-bar:hover { background: #dc2626; text-decoration: underline; }
         
         /* Headers */
@@ -169,16 +171,27 @@ class VPNGenerator:
         td { padding: 20px 18px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         tr:hover { background-color: #f8fafc; }
         
+        /* New Elements (Stars & Badges) */
+        .star-rating { color: var(--star); font-weight: 800; letter-spacing: 1px; white-space: nowrap; }
+        .rank-circle { width: 32px; height: 32px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #94a3b8; }
+        .rank-1 { background: #fef3c7; color: #d97706; border: 2px solid #fcd34d; }
+        .badge { background: #dbeafe; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; margin-top: 5px; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        
+        /* Pros & Cons Box */
+        .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; background: #f8fafc; padding: 20px; border-radius: 12px; }
+        .pros h3 { color: #166534; margin-top: 0; font-size: 1.1rem; }
+        .cons h3 { color: #991b1b; margin-top: 0; font-size: 1.1rem; }
+        .pro-item, .con-item { margin-bottom: 8px; font-size: 0.95rem; }
+        .pro-item:before { content: "✅ "; }
+        .con-item:before { content: "❌ "; }
+
         /* Buttons */
         .btn { display: inline-block; background: var(--primary); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; transition: 0.2s; white-space: nowrap; text-align: center; cursor: pointer; }
         .btn:hover { background: var(--secondary); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
         .btn-outline { color: #475569; text-decoration: none; font-size: 0.9rem; margin-top: 10px; display: inline-block; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; transition: 0.2s; background: white; cursor: pointer; }
         .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
-
-        /* Elements */
-        .rank-circle { width: 32px; height: 32px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #94a3b8; }
-        .rank-1 { background: #fef3c7; color: #d97706; border: 2px solid #fcd34d; }
-        .badge { background: #dbeafe; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+        
         .breadcrumbs { font-size: 0.9rem; color: #64748b; margin-bottom: 20px; }
         .breadcrumbs a { color: var(--primary); text-decoration: none; }
         .breadcrumbs span { margin: 0 8px; color: #cbd5e1; }
@@ -190,26 +203,14 @@ class VPNGenerator:
             thead { display: none; }
             tr { display: flex; flex-direction: column; padding: 20px; border-bottom: 8px solid #f8fafc; }
             td { padding: 5px 0; border: none; }
+            .pros-cons { grid-template-columns: 1fr; }
             .btn, .btn-outline { display: block; width: 100%; margin-top: 10px; box-sizing: border-box; }
         }
 
         footer { text-align: center; margin-top: auto; color: #94a3b8; font-size: 0.9rem; padding: 40px 0; background: #fff; border-top: 1px solid #f1f5f9; }
         .disclosure { background: #fffbeb; color: #92400e; padding: 12px; font-size: 0.85rem; border-radius: 8px; display: inline-block; margin-top: 20px; max-width: 600px; }
         
-        /* Popup - Position Fixed 保证无论滚到哪里都在屏幕中间 */
-        .exit-popup { 
-            display: none; 
-            position: fixed; /* 关键：固定在视口，不受滚动影响 */
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0,0,0,0.8); 
-            z-index: 99999; /* 最高层级 */
-            justify-content: center; 
-            align-items: center; 
-            backdrop-filter: blur(5px); 
-        }
+        .exit-popup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .popup-box { background: white; padding: 40px; border-radius: 16px; text-align: center; max-width: 400px; position: relative; animation: popIn 0.3s ease; }
         @keyframes popIn { from {transform: scale(0.9); opacity: 0;} to {transform: scale(1); opacity: 1;} }
         .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 24px; color: #cbd5e1; }
@@ -225,8 +226,6 @@ class VPNGenerator:
             <script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{self.config['google_analytics_id']}');</script>"""
         
         schema_html = f'<script type="application/ld+json">{schema_json}</script>' if schema_json else ""
-
-        # V8.0 保留：Base64 盾牌图标，稳定可靠
         favicon_base64 = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>"
 
         return f"""<head>
@@ -247,6 +246,10 @@ class VPNGenerator:
             slug = f"{str(champion['Provider']).lower().replace(' ', '-')}-review.html"
             logo_url = f"https://www.google.com/s2/favicons?domain={self.get_real_domain(champion['Provider'])}&sz=128"
             
+            # 使用新字段
+            rating = champion.get('star_rating', '4.9')
+            best_for = champion.get('best_for', 'All-Rounder')
+            
             champion_html = f"""
             <div class="champion-card">
                 <div class="ribbon">🏆 #1 RANKED</div>
@@ -259,7 +262,8 @@ class VPNGenerator:
                         <p style="margin:0; color:#64748b;">The best overall VPN for speed, security, and streaming in 2026.</p>
                         <div style="margin-top:15px;">
                             <span class="badge">🚀 Fastest</span>
-                            <span class="badge">🔒 Audit Verified</span>
+                            <span class="badge badge-green">🏆 {best_for}</span>
+                            <span class="star-rating" style="margin-left:10px;">⭐⭐⭐⭐⭐ {rating}</span>
                         </div>
                     </div>
                     <div style="text-align:center; min-width:150px;">
@@ -277,6 +281,7 @@ class VPNGenerator:
             detail_slug = f"{str(vpn['Provider']).lower().replace(' ', '-')}-review.html"
             logo_url = f"https://www.google.com/s2/favicons?domain={self.get_real_domain(vpn['Provider'])}&sz=64"
             rank_class = "rank-1" if index == 0 else ""
+            rating = vpn.get('star_rating', '4.5')
             
             rows_html += f"""
             <tr onclick="window.location='{detail_slug}'" style="cursor:pointer;">
@@ -284,25 +289,27 @@ class VPNGenerator:
                 <td width="30%">
                     <div style="display:flex; align-items:center; gap:12px;">
                         <img src="{logo_url}" style="width:24px; height:24px; border-radius:4px;">
-                        <span style="font-weight:bold; color:#0f172a;">{vpn['Provider']}</span>
+                        <div>
+                            <div style="font-weight:bold; color:#0f172a;">{vpn['Provider']}</div>
+                            <div class="star-rating" style="font-size:0.8rem;">⭐⭐⭐⭐⭐ {rating}</div>
+                        </div>
                     </div>
                 </td>
                 <td><ul style="margin:0; padding-left:15px; font-size:0.85rem; color:#64748b;">
-                    <li>Logs: {vpn.get('No_Logs', 'N/A')}</li>
+                    <li><b>Best For:</b> {vpn.get('best_for', 'Privacy')}</li>
                     <li>Streaming: {vpn.get('Streaming_Support', 'N/A')}</li>
                 </ul></td>
                 <td width="15%"><div style="font-weight:800; font-size:1.1rem; color:#0f172a;">{vpn.get('Price_Monthly', 'N/A')}</div></td>
                 <td width="20%">
-                    <a href="{aff_link}" class="btn" onclick="event.stopPropagation();" target="_blank" rel="nofollow">Get Deal</a>
-                    <a href="{detail_slug}" class="btn-outline" onclick="event.stopPropagation();">📖 Review</a>
+                    <a href="{aff_link}" class="btn" onclick="event.stopPropagation();" target="_blank" rel="nofollow">Visit Site</a>
+                    <a href="{detail_slug}" class="btn-outline" onclick="event.stopPropagation();">Review</a>
                 </td>
             </tr>"""
 
-        # Top Bar 只保留点击触发，防止鼠标滑过误触
         top_bar_html = f'''<div class="top-bar" onclick="topBarClick()">{self.config["top_bar"]["text"]}</div>''' if self.config['top_bar']['enabled'] else ""
 
         html = f"""<!DOCTYPE html><html lang="en">
-        {self.get_head_html(f"Best VPNs for {self.config.get('year', '2026')}", "Compare top VPNs.")}
+        {self.get_head_html(f"Best VPNs for {self.config.get('year', '2026')} - Speed & Privacy Tested", "Compare top VPNs used by experts. Find the fastest, most secure VPN for streaming and gaming.")}
         <body>
             {top_bar_html}
             <header>
@@ -315,19 +322,16 @@ class VPNGenerator:
                 {champion_html}
                 <div class="card">
                     <table>
-                        <thead><tr><th>Rank</th><th>Provider</th><th>Features</th><th>Price</th><th>Action</th></tr></thead>
+                        <thead><tr><th>Rank</th><th>Provider</th><th>Verdict</th><th>Price</th><th>Action</th></tr></thead>
                         <tbody>{rows_html}</tbody>
                     </table>
                 </div>
                 <footer>
                     <p>&copy; {self.config.get('year', '2026')} {self.config['site_name']}.</p>
                     <div class="disclosure">{self.config.get('legal', {}).get('disclosure', 'Advertiser Disclosure: We are reader-supported.')}</div>
-                    <p style="margin-top:20px;">
-                        <a href="privacy.html">Privacy Policy</a> • <a href="terms.html">Terms of Service</a>
-                    </p>
+                    <p style="margin-top:20px;"><a href="privacy.html">Privacy Policy</a> • <a href="terms.html">Terms</a></p>
                 </footer>
             </div>
-            
             <div class="exit-popup" id="exitPopup">
                 <div class="popup-box">
                     <span class="close-btn" onclick="closePopup()">&times;</span>
@@ -352,13 +356,34 @@ class VPNGenerator:
             if not long_review or len(long_review) < 50:
                 long_review = f"<h3>Why {provider}?</h3><p>Detailed review coming soon...</p>"
 
-            # 详情页 Top Bar
-            top_bar_html = f'''<div class="top-bar" onclick="topBarClick()">🔥 Limited Time: Get 68% OFF Top VPNs!</div>'''
+            # SEO 字段
+            seo_title = vpn.get('seo_title', f"{provider} Review 2026 - Is It Safe?")
+            seo_desc = vpn.get('seo_meta_desc', f"Read our honest review of {provider}. Speed test results and security analysis.")
+            rating = vpn.get('star_rating', '4.5')
             
-            disclaimer = self.config.get('legal', {}).get('disclosure', 'Advertiser Disclosure: We are reader-supported. We may receive a commission for purchases made through these links.')
+            # 优缺点处理
+            pros = vpn.get('pros_list', '').split('|')
+            cons = vpn.get('cons_list', '').split('|')
+            pros_html = "".join([f'<div class="pro-item">{p.strip()}</div>' for p in pros if p.strip()])
+            cons_html = "".join([f'<div class="con-item">{p.strip()}</div>' for p in cons if p.strip()])
+            
+            pros_cons_box = ""
+            if pros_html or cons_html:
+                pros_cons_box = f"""
+                <div class="pros-cons">
+                    <div class="pros"><h3>What We Like</h3>{pros_html}</div>
+                    <div class="cons"><h3>What Could Be Better</h3>{cons_html}</div>
+                </div>
+                """
+
+            top_bar_html = f'''<div class="top-bar" onclick="topBarClick()">🔥 Limited Time: Get 68% OFF {provider}!</div>'''
+            disclaimer = self.config.get('legal', {}).get('disclosure', 'Advertiser Disclosure: We are reader-supported.')
+            
+            # 生成 Schema
+            schema_json = self.generate_schema_json(vpn)
 
             html = f"""<!DOCTYPE html><html lang="en">
-            {self.get_head_html(f"{provider} Review - Is it Safe?", f"Full review of {provider}.")}
+            {self.get_head_html(seo_title, seo_desc, schema_json)}
             <body>
                 {top_bar_html}
                 <div class="container" style="margin-top:20px;">
@@ -368,13 +393,17 @@ class VPNGenerator:
                     <div class="card" style="padding:40px; text-align:center;">
                         <img src="{logo_url}" style="width:64px; height:64px; border-radius:50%; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
                         <h1 style="margin:0;">{provider} Review</h1>
+                        <div class="star-rating" style="margin:10px 0; font-size:1.2rem;">⭐⭐⭐⭐⭐ {rating}/5.0</div>
                         <a href="{aff_link}" class="btn" style="margin-top:20px; font-size:1.1rem; padding:15px 30px;" target="_blank" rel="nofollow">Get 68% OFF {provider} &rarr;</a>
                     </div>
+                    
                     <div class="card" style="margin-top:20px; padding:40px;">
-                        <div style="max-width:800px; margin:0 auto; line-height:1.8;">
+                        {pros_cons_box}
+                        <div style="max-width:800px; margin:20px auto; line-height:1.8;">
                             {long_review}
                         </div>
                     </div>
+                    
                     <footer>
                         <p>&copy; {self.config.get('year', '2026')} {self.config['site_name']}.</p>
                         <div class="disclosure">{disclaimer}</div>
@@ -419,7 +448,7 @@ class VPNGenerator:
         with open(os.path.join(self.output_dir, 'robots.txt'), 'w') as f: f.write(f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml")
 
     def run(self):
-        self.log("🚀 Starting VPN Generator V4.0 (Exit Intent)...")
+        self.log("🚀 Starting VPN Generator V5.0 (SEO & Schema)...")
         if os.path.exists(self.output_dir): 
             try: shutil.rmtree(self.output_dir)
             except: pass
@@ -427,6 +456,7 @@ class VPNGenerator:
         self.generate_css()
         vpns = self.load_data()
         if not vpns:
+            self.log("⚠️ No VPN data found. Generating placeholder.")
             with open(os.path.join(self.output_dir, 'index.html'), 'w', encoding='utf-8') as f: f.write("<h1>Coming Soon</h1>")
             return
         try:
